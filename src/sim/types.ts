@@ -5,6 +5,8 @@ export interface Packet {
   /** Time (ms) the sender put it on the wire; used for RTT samples. */
   sentAt: number;
   retransmit: boolean;
+  /** Set by the router when the packet joins its queue. */
+  enqueuedAt?: number;
 }
 
 /** A cumulative ACK: "I have everything below `ack`". */
