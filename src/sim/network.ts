@@ -41,6 +41,10 @@ export class Network {
   /** Sum and count of queueing delays, for the average. */
   private delaySum = 0;
   private delayCount = 0;
+  /** delayHist[d] = how many packets waited exactly d ms (ticks are whole ms). */
+  private delayHist: number[] = [];
+  /** Packets the player removed by hand. */
+  playerDrops = 0;
 
   constructor(readonly config: NetworkConfig) {
     this.queue = config.queue;
@@ -74,8 +78,10 @@ export class Network {
     while (this.linkFreeAt <= now) {
       const pkt = this.queue.dequeue(now);
       if (!pkt) break;
-      this.delaySum += now - (pkt.enqueuedAt ?? now);
+      const waited = now - (pkt.enqueuedAt ?? now);
+      this.delaySum += waited;
       this.delayCount++;
+      this.delayHist[waited] = (this.delayHist[waited] ?? 0) + 1;
       this.linkFreeAt = Math.max(this.linkFreeAt, now - 1) + this.txTime;
       this.busyTime += this.txTime;
       this.onLink.push({ at: this.linkFreeAt + this.config.propDelay, pkt });
@@ -87,6 +93,30 @@ export class Network {
       this.flowStats[pkt.flow]!.delivered = this.receivers[pkt.flow]!.delivered;
       this.onAckPath.push({ at: now + this.config.ackDelay, ack });
     }
+  }
+
+  /**
+   * The player drops the packet at `index` in the router queue (0 = next to
+   * leave). The sender sees it exactly like an overflow drop.
+   */
+  dropAt(index: number): boolean {
+    const pkt = this.queue.remove(index);
+    if (!pkt) return false;
+    this.flowStats[pkt.flow]!.drops++;
+    this.playerDrops++;
+    return true;
+  }
+
+  /** The `p`-th percentile (0..1) of queueing delay so far, in ms. */
+  delayPercentile(p: number): number {
+    if (this.delayCount === 0) return 0;
+    const rank = Math.ceil(p * this.delayCount);
+    let seen = 0;
+    for (let d = 0; d < this.delayHist.length; d++) {
+      seen += this.delayHist[d] ?? 0;
+      if (seen >= rank) return d;
+    }
+    return this.delayHist.length - 1;
   }
 
   /** Fraction of time the bottleneck link was busy. */

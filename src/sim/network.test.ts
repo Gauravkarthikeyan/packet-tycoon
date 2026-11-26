@@ -37,4 +37,27 @@ describe("Network (end-to-end behaviour)", () => {
     const total = net.flowStats.reduce((a, f) => a + f.delivered, 0);
     expect(total).toBeLessThanOrEqual(2500);
   });
+
+  it("p95 delay tracks the buffer: tiny buffer, tiny tail", () => {
+    const small = new Network({ ...base, queue: new DropTail(10), flows: 1 });
+    const big = new Network({ ...base, queue: new DropTail(200), flows: 1 });
+    small.run(20_000);
+    big.run(20_000);
+    expect(small.delayPercentile(0.95)).toBeLessThanOrEqual(10);
+    expect(big.delayPercentile(0.95)).toBeGreaterThan(100);
+    expect(big.delayPercentile(0.5)).toBeLessThanOrEqual(big.delayPercentile(0.95));
+  });
+
+  it("a player drop counts as a loss and the sender reacts to it", () => {
+    const net = new Network({ ...base, queue: new DropTail(200), flows: 1 });
+    net.run(5_000);
+    const before = net.senders[0]!.stats.fastRetransmits + net.senders[0]!.stats.timeouts;
+    expect(net.dropAt(net.queue.length - 1)).toBe(true);
+    expect(net.dropAt(10_000)).toBe(false);
+    net.run(1_000);
+    const after = net.senders[0]!.stats.fastRetransmits + net.senders[0]!.stats.timeouts;
+    expect(net.playerDrops).toBe(1);
+    expect(net.flowStats[0]!.drops).toBeGreaterThanOrEqual(1);
+    expect(after).toBeGreaterThan(before);
+  });
 });
