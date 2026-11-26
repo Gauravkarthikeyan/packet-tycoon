@@ -13,8 +13,8 @@ times and never really *felt* why it happens. Now I can cause it on purpose.
 
 ![packet-tycoon sandbox: router queue on the left, cwnd sawtooth per flow and queue length on the right](docs/screenshot.png)
 
-> **Status:** the sandbox and level 1 are playable: click packets in the queue to
-> drop them. More levels and unlockable queue algorithms (RED, CoDel, fair
+> **Status:** the sandbox and two levels are playable: click packets in the queue
+> to drop them. More levels and unlockable queue algorithms (RED, CoDel, fair
 > queueing) are next.
 
 ## Level 1: Keep it under 50 ms
@@ -42,6 +42,33 @@ between about 36 and 50 ms, and the stars reward getting close to 40.
   your queue overflows: the famous sawtooth.
 - **Bottom chart — queue length.** When it sits near the top, every packet is
   waiting in line. That waiting *is* latency.
+
+## Level 2: One at a time
+
+Four senders, a 120-packet buffer, and a stricter goal: p95 wait ≤ 30 ms with
+the link ≥ 96 % busy. The obvious move from level 1 (keep the queue under a
+line) fails here. I wrote little scripted players to balance the level, and
+they showed why:
+
+| Strategy | p95 queueing delay | Link utilisation | Drops | Timeouts |
+|---|---:|---:|---:|---:|
+| do nothing | 119 ms | 99.5 % | 150 | 2 |
+| drop everything above 30 | 30 ms | 93.9 % | 196 | 0 |
+| one drop per RTT, newest packet | 30 ms | 98.2 % | 153 | 1 |
+| one drop per RTT, biggest flow | 31 ms | 97.7 % | 148 | 3 |
+| one drop per RTT, oldest packet | 29 ms | 98.2 % | 116 | 0 |
+
+Clipping the queue at a line drops a burst, the burst hits several flows, and
+they all halve their windows in the same round trip. That's global
+synchronisation, and the link goes quiet. Spacing drops one round trip apart
+gets about 4 % more throughput at the same delay.
+
+I expected *which* flow you punish to matter most, but it barely does. Pacing
+is what matters. Dropping the **oldest** packet is best: same throughput with
+40 fewer drops and no timeouts, because the sender learns about the loss a
+whole queue's worth of waiting earlier. That's why CoDel drops from the head of
+the queue, and it's the rule I wish someone had told me before I played my
+first ten rounds.
 
 ## Things I found playing with it
 
@@ -122,8 +149,8 @@ The full reasoning is in [DESIGN.md](DESIGN.md).
 ```sh
 npm install
 npm run dev     # play
-npm test        # 26 tests: unit, end-to-end behaviour, and that level 1 is winnable
-npm run experiments   # regenerate the tables above
+npm test        # 31 tests: unit, end-to-end behaviour, and that the levels are winnable
+npm run experiments   # regenerate every table in this README
 ```
 
 ## Limitations
@@ -141,7 +168,8 @@ npm run experiments   # regenerate the tables above
 - [x] Simulation core: queue, link, receivers, NewReno, metrics
 - [x] Sandbox with live charts
 - [x] Click packets to drop them; level system with goals, stars and a score screen
-- [ ] More levels (many flows, a latency-sensitive video call, a bursty download)
+- [x] Level 2: four flows, pace your drops
+- [ ] More levels (a latency-sensitive video call, a bursty download)
 - [ ] Power-ups: RED, CoDel, fair queueing
 - [ ] More senders: CUBIC, BBR-lite (good luck taming that one)
 - [ ] Mixed RTTs, bursty "Windows Update" traffic, a latency-sensitive video-call flow
