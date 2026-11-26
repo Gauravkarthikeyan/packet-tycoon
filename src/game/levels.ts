@@ -9,6 +9,8 @@ export interface Level {
   flows: number;
   buffer: number;
   durationMs: number;
+  /** Suggested game speed (simulated ms per frame); lower = more time to click. */
+  speed: number;
   goal: {
     /** 95th percentile queueing delay must stay at or below this (ms). */
     maxP95Delay: number;
@@ -29,7 +31,19 @@ export const LEVELS: readonly Level[] = [
     flows: 1,
     buffer: 200,
     durationMs: 30_000,
+    speed: 8,
     goal: { maxP95Delay: 50, minUtilization: 0.9 },
+  },
+  {
+    id: 2,
+    title: "One at a time",
+    brief:
+      "Four senders share the link now. Drop a burst and they all halve their windows together, and the link goes quiet. Drop one packet, then give it a round trip (40 ms) to work before the next.",
+    flows: 4,
+    buffer: 120,
+    durationMs: 20_000,
+    speed: 4,
+    goal: { maxP95Delay: 30, minUtilization: 0.96 },
   },
 ];
 

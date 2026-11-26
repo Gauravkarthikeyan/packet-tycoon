@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { LEVELS, evaluate, startLevel } from "./levels";
+import type { Network } from "../sim/network";
+import { LEVELS, evaluate, startLevel, type Level } from "./levels";
 
 const level1 = LEVELS[0]!;
+const level2 = LEVELS[1]!;
 
 function play(dropAbove: number | undefined) {
   const net = startLevel(level1);
@@ -42,5 +44,40 @@ describe("evaluate", () => {
     expect(play(48).stars).toBe(1);
     expect(play(44).stars).toBe(2);
     expect(play(40).stars).toBe(3);
+  });
+});
+
+/** Plays `level`, calling `player` after every tick. */
+function playWith(level: Level, player: (net: Network) => void) {
+  const net = startLevel(level);
+  for (let t = 0; t < level.durationMs; t++) {
+    net.tick();
+    player(net);
+  }
+  return evaluate(net, level);
+}
+
+describe("level 2: One at a time", () => {
+  it("fails if you just watch", () => {
+    expect(playWith(level2, () => {}).passed).toBe(false);
+  });
+
+  it("fails if you drop everything above a line: flows back off together", () => {
+    const r = playWith(level2, (net) => {
+      while (net.queue.length > 30) net.dropAt(net.queue.length - 1);
+    });
+    expect(r.p95Delay).toBeLessThanOrEqual(level2.goal.maxP95Delay);
+    expect(r.utilization).toBeLessThan(level2.goal.minUtilization);
+  });
+
+  it("passes with one drop per round trip, oldest packet first", () => {
+    let last = -Infinity;
+    const r = playWith(level2, (net) => {
+      if (net.queue.length > 28 && net.now - last >= 40) {
+        net.dropAt(0);
+        last = net.now;
+      }
+    });
+    expect(r.passed).toBe(true);
   });
 });

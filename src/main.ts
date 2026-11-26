@@ -42,6 +42,7 @@ function reset(): void {
   level = LEVELS.find((l) => String(l.id) === modeSelect.value);
   if (level) {
     net = startLevel(level);
+    controls.speed.value = String(level.speed);
     phase = "brief";
     showBrief(level);
   } else {
