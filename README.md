@@ -13,8 +13,24 @@ times and never really *felt* why it happens. Now I can cause it on purpose.
 
 ![packet-tycoon sandbox: router queue on the left, cwnd sawtooth per flow and queue length on the right](docs/screenshot.png)
 
-> **Status:** the simulation core and a sandbox are working. Levels, goals,
-> click-to-drop and unlockable queue algorithms (RED, CoDel, fair queueing) are next.
+> **Status:** the sandbox and level 1 are playable: click packets in the queue to
+> drop them. More levels and unlockable queue algorithms (RED, CoDel, fair
+> queueing) are next.
+
+## Level 1: Keep it under 50 ms
+
+Someone gave the router a 200-packet buffer. Left alone, a single Reno sender
+fills it and the 95th-percentile wait climbs past 150 ms. Your job is to click
+packets out of the queue so that 95 % of packets wait at most 50 ms, while the
+link stays at least 90 % busy.
+
+![Level 1 score screen: two stars, p95 delay 41 ms, utilisation 98 %, 11 packets dropped by hand, with the cwnd sawtooth behind it](docs/level1.png)
+
+Each click is a loss signal, so the sender halves its window and the queue
+drains. Click too often and the link goes idle. Click too late and the tail
+delay blows the goal. With one Reno flow you can't beat the buffer-size
+trade-off from the table below, only hug it: passing means a p95 somewhere
+between about 36 and 50 ms, and the stars reward getting close to 40.
 
 ## What you're looking at
 
@@ -106,7 +122,7 @@ The full reasoning is in [DESIGN.md](DESIGN.md).
 ```sh
 npm install
 npm run dev     # play
-npm test        # 16 tests: unit tests + end-to-end behaviour (saturation, bufferbloat, fairness)
+npm test        # 26 tests: unit, end-to-end behaviour, and that level 1 is winnable
 npm run experiments   # regenerate the tables above
 ```
 
@@ -124,7 +140,8 @@ npm run experiments   # regenerate the tables above
 
 - [x] Simulation core: queue, link, receivers, NewReno, metrics
 - [x] Sandbox with live charts
-- [ ] Click packets to drop them; levels with goals and scores
+- [x] Click packets to drop them; level system with goals, stars and a score screen
+- [ ] More levels (many flows, a latency-sensitive video call, a bursty download)
 - [ ] Power-ups: RED, CoDel, fair queueing
 - [ ] More senders: CUBIC, BBR-lite (good luck taming that one)
 - [ ] Mixed RTTs, bursty "Windows Update" traffic, a latency-sensitive video-call flow
