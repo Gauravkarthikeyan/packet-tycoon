@@ -1,4 +1,4 @@
-# packet-tycoon 📦🔥
+# packet-tycoon
 
 **A browser game where you are the router.**
 
@@ -13,7 +13,7 @@ times and never really *felt* why it happens. Now I can cause it on purpose.
 
 ![packet-tycoon sandbox: router queue on the left, cwnd sawtooth per flow and queue length on the right](docs/screenshot.png)
 
-> 🚧 **Status:** the simulation core and a sandbox are working. Levels, goals,
+> **Status:** the simulation core and a sandbox are working. Levels, goals,
 > click-to-drop and unlockable queue algorithms (RED, CoDel, fair queueing) are next.
 
 ## What you're looking at
@@ -55,12 +55,10 @@ motivations for RED.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  S[N senders<br/>NewReno] -->|infinitely fast access links| Q[(router queue<br/>drop-tail)]
-  Q -->|bottleneck: rate R, delay d| R[receivers]
-  R -.->|cumulative ACKs, fixed delay| S
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/topology-dark.svg">
+  <img alt="Four NewReno senders feed one router queue (you). It drains over a 1000 packets/s, 20 ms bottleneck link to the receivers, whose ACKs come back on a path that is never congested." src="docs/topology-light.svg" width="880">
+</picture>
 
 - **Deterministic 1 ms ticks.** The renderer just runs N ticks per animation
   frame, so "game speed" is a slider and the whole simulation is unit-testable.
