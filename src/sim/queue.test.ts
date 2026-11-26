@@ -30,4 +30,15 @@ describe("DropTail", () => {
     expect(q.length).toBe(1000);
     expect(q.packets()[0]?.seq).toBe(3000);
   });
+
+  it("removes a packet from the middle without breaking FIFO order", () => {
+    const q = new DropTail(10);
+    [1, 2, 3, 4].forEach((s) => q.enqueue(pkt(s)));
+    q.dequeue();
+    expect(q.remove(1)?.seq).toBe(3);
+    expect(q.packets().map((p) => p.seq)).toEqual([2, 4]);
+    expect(q.remove(2)).toBeUndefined();
+    expect(q.remove(-1)).toBeUndefined();
+    expect(q.dequeue()?.seq).toBe(2);
+  });
 });

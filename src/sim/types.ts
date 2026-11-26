@@ -23,6 +23,8 @@ export interface QueueDiscipline {
   /** Returns false if the packet was dropped. */
   enqueue(pkt: Packet, now: number): boolean;
   dequeue(now: number): Packet | undefined;
+  /** Remove the packet at `index` (0 = front), e.g. when the player clicks it. */
+  remove(index: number): Packet | undefined;
   readonly length: number;
   readonly capacity: number;
   /** Snapshot for rendering, front of the queue first. */

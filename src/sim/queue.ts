@@ -35,6 +35,11 @@ export class DropTail implements QueueDiscipline {
     return pkt;
   }
 
+  remove(index: number): Packet | undefined {
+    if (!Number.isInteger(index) || index < 0 || index >= this.length) return undefined;
+    return this.buf.splice(this.head + index, 1)[0];
+  }
+
   packets(): readonly Packet[] {
     return this.buf.slice(this.head);
   }
