@@ -8,12 +8,23 @@
   <body>
     <header>
       <h1>packet-tycoon <small>— you are the router</small></h1>
-      <label>buffer <input id="buffer" type="range" min="5" max="400" value="40" /> <span id="buffer-value"></span></label>
-      <label>flows <input id="flows" type="range" min="1" max="6" value="3" /> <span id="flows-value"></span></label>
+      <label>mode <select id="mode"></select></label>
+      <label class="sandbox-only">buffer <input id="buffer" type="range" min="5" max="400" value="40" /> <span id="buffer-value"></span></label>
+      <label class="sandbox-only">flows <input id="flows" type="range" min="1" max="6" value="3" /> <span id="flows-value"></span></label>
       <label>speed <input id="speed" type="range" min="1" max="50" value="8" /> <span id="speed-value"></span> ms/frame</label>
       <button id="reset">restart</button>
+      <p id="hud" hidden></p>
     </header>
-    <canvas id="game"></canvas>
+    <main>
+      <canvas id="game"></canvas>
+      <div id="overlay" hidden>
+        <div class="card" role="dialog" aria-labelledby="overlay-title">
+          <h2 id="overlay-title"></h2>
+          <p id="overlay-body"></p>
+          <div id="overlay-actions"></div>
+        </div>
+      </div>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

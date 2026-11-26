@@ -6,6 +6,7 @@ export const FLOW_COLORS = ["#ff6b6b", "#4dabf7", "#51cf66", "#fcc419", "#cc5de8
 const BG = "#0f1117";
 const FG = "#e6e6e6";
 const MUTED = "#6b7280";
+const GOAL = "#ff922b";
 
 /** Rolling cwnd history per flow, sampled every frame. */
 export class History {
@@ -25,7 +26,13 @@ function push(arr: number[], v: number, max: number): void {
   if (arr.length > max) arr.shift();
 }
 
-export function draw(ctx: CanvasRenderingContext2D, net: Network, hist: History): void {
+/** `goal`: a queue length to mark on the column, with its label (e.g. "50 ms"). */
+export function draw(
+  ctx: CanvasRenderingContext2D,
+  net: Network,
+  hist: History,
+  goal?: { packets: number; label: string },
+): void {
   const { width: w, height: h } = ctx.canvas;
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -45,8 +52,20 @@ export function draw(ctx: CanvasRenderingContext2D, net: Network, hist: History)
     ctx.fillRect(qx, qBottom - (i + 1) * cell, qw, Math.max(cell - (cell > 3 ? 1 : 0), 0.5));
   });
   ctx.globalAlpha = 1;
-  ctx.fillStyle = FG;
   ctx.font = "13px ui-monospace, monospace";
+  if (goal) {
+    const gy = qBottom - goal.packets * cell;
+    ctx.strokeStyle = GOAL;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(qx - 6, gy);
+    ctx.lineTo(qx + qw + 6, gy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = GOAL;
+    ctx.fillText(goal.label, qx + qw + 10, gy + 4);
+  }
+  ctx.fillStyle = FG;
   ctx.fillText("YOUR QUEUE", qx - 4, 24);
   ctx.fillStyle = MUTED;
   ctx.fillText(`${net.queue.length}/${cap}`, qx, 40);

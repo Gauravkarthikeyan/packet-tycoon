@@ -7,3 +7,22 @@ h1 small { color: #6b7280; font-weight: normal; }
 label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 button { font: inherit; background: #252a36; color: inherit; border: 1px solid #3a4150; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
 canvas { flex: 1; width: 100%; min-height: 0; }
+select { font: inherit; background: #252a36; color: inherit; border: 1px solid #3a4150; border-radius: 6px; padding: 3px 8px; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #ff922b; outline-offset: 2px; }
+button.primary { background: #ff922b; border-color: #ff922b; color: #0f1117; font-weight: 700; }
+main { flex: 1; position: relative; display: flex; min-height: 0; }
+#game { cursor: crosshair; touch-action: none; }
+#hud { margin: 0 0 0 auto; font-size: 13px; display: flex; gap: 16px; }
+#hud .ok { color: #51cf66; }
+#hud .bad { color: #ff6b6b; }
+#overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(15 17 23 / 0.82); padding: 16px; }
+#overlay[hidden], #hud[hidden] { display: none; }
+.card { max-width: 460px; background: #171b24; border: 1px solid #3a4150; border-radius: 10px; padding: 20px 24px; }
+.card h2 { margin: 0 0 8px; font-size: 18px; }
+.card p { margin: 0 0 16px; font-size: 14px; line-height: 1.55; color: #c9ced8; }
+.card table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+.card td { padding: 4px 0; }
+.card td:last-child { text-align: right; }
+.stars { font-size: 22px; letter-spacing: 4px; color: #fcc419; margin-bottom: 8px; }
+#overlay-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sandbox-only[aria-disabled="true"] { opacity: 0.4; }
