@@ -65,10 +65,9 @@ gets about 4 % more throughput at the same delay.
 
 I expected *which* flow you punish to matter most, but it barely does. Pacing
 is what matters. Dropping the **oldest** packet is best: same throughput with
-40 fewer drops and no timeouts, because the sender learns about the loss a
-whole queue's worth of waiting earlier. That's why CoDel drops from the head of
-the queue, and it's the rule I wish someone had told me before I played my
-first ten rounds.
+37 fewer drops and no timeouts, because the sender learns about the loss a
+whole queue's worth of waiting earlier. It's also one of the reasons CoDel drops
+from the head of the queue.
 
 ## Things I found playing with it
 
