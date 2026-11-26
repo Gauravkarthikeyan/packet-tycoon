@@ -1,3 +1,4 @@
+import { queueLayout } from "./layout";
 import type { Network } from "./sim/network";
 
 export const FLOW_COLORS = ["#ff6b6b", "#4dabf7", "#51cf66", "#fcc419", "#cc5de8", "#ff922b"];
@@ -34,12 +35,8 @@ export function draw(ctx: CanvasRenderingContext2D, net: Network, hist: History)
   ctx.fillRect(0, 0, W, H);
 
   // --- the router queue: a column of packets, front of the queue at the bottom
-  const qx = 24;
-  const qw = 64;
-  const qTop = 48;
-  const qBottom = H - 32;
   const cap = net.queue.capacity;
-  const cell = (qBottom - qTop) / cap;
+  const { x: qx, width: qw, top: qTop, bottom: qBottom, cell } = queueLayout(H, cap);
   ctx.strokeStyle = MUTED;
   ctx.strokeRect(qx - 0.5, qTop - 0.5, qw + 1, qBottom - qTop + 1);
   net.queue.packets().forEach((p, i) => {

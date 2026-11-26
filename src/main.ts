@@ -1,3 +1,4 @@
+import { packetAt, queueLayout } from "./layout";
 import { draw, History } from "./render";
 import { Network } from "./sim/network";
 import { DropTail } from "./sim/queue";
@@ -49,6 +50,14 @@ controls.speed.addEventListener("input", () => {
 });
 $("reset").addEventListener("click", reset);
 window.addEventListener("resize", resize);
+
+// Click (or tap) a packet in the queue to drop it.
+canvas.addEventListener("pointerdown", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const layout = queueLayout(rect.height, net.queue.capacity);
+  const index = packetAt(layout, net.queue.length, e.clientX - rect.left, e.clientY - rect.top);
+  if (index !== undefined) net.dropAt(index);
+});
 
 resize();
 reset();
