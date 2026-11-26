@@ -1,4 +1,5 @@
 import { evaluate, LEVELS, startLevel, type Level, type Result } from "./game/levels";
+import { loadBest, recordStars } from "./game/progress";
 import { packetAt, queueLayout } from "./layout";
 import { draw, History } from "./render";
 import { Network } from "./sim/network";
@@ -31,12 +32,18 @@ let hist: History;
 let level: Level | undefined;
 let phase: Phase = "sandbox";
 
-for (const [value, text] of [
-  ["sandbox", "sandbox"],
-  ...LEVELS.map((l) => [String(l.id), `level ${l.id} · ${l.title}`]),
-]) {
-  modeSelect.add(new Option(text, value));
+let best = loadBest();
+
+function fillModeSelect(): void {
+  const selected = modeSelect.value || "sandbox";
+  modeSelect.replaceChildren(new Option("sandbox", "sandbox"));
+  for (const l of LEVELS) {
+    const stars = best[l.id] ? ` ${"★".repeat(best[l.id]!)}` : "";
+    modeSelect.add(new Option(`level ${l.id} · ${l.title}${stars}`, String(l.id)));
+  }
+  modeSelect.value = selected;
 }
+fillModeSelect();
 
 function reset(): void {
   level = LEVELS.find((l) => String(l.id) === modeSelect.value);
@@ -115,7 +122,23 @@ function showResult(l: Level, r: Result): void {
     table.insertRow().append(...[k, v].map((t) => Object.assign(document.createElement("td"), { textContent: t })));
   }
   card.append(stars, verdict, table);
+  best = recordStars(best, l.id, r.stars);
+  fillModeSelect();
+  const next = LEVELS.find((x) => x.id === l.id + 1);
+  const goNext: [string, () => void][] =
+    r.passed && next
+      ? [
+          [
+            "Next level",
+            () => {
+              modeSelect.value = String(next.id);
+              reset();
+            },
+          ],
+        ]
+      : [];
   showOverlay(r.passed ? "Level complete" : "Not quite", card, [
+    ...goNext,
     ["Try again", reset],
     [
       "Sandbox",
