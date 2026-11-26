@@ -53,6 +53,33 @@ synchronisation**: one overflow drops packets from *every* flow at once, so they
 all halve together and the link briefly goes quiet. That's one of the original
 motivations for RED.
 
+### More flows than the pipe can hold
+
+Same link, a 40-packet buffer, more and more senders:
+
+| Flows | Link utilisation | Avg. queueing delay | Jain fairness | Drops | Timeouts |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 98.0 % | 22 ms | 1.000 | 11 | 0 |
+| 2 | 95.1 % | 22 ms | 0.999 | 88 | 0 |
+| 4 | 95.2 % | 24 ms | 0.997 | 220 | 0 |
+| 8 | 97.0 % | 25 ms | 0.992 | 497 | 0 |
+| 16 | 97.1 % | 25 ms | 0.974 | 1190 | 82 |
+| 32 | 95.2 % | 25 ms | 0.911 | 2773 | 1518 |
+
+Up to 8 flows nothing dramatic happens. Then the timeouts column explodes.
+The pipe plus the buffer hold about 80 packets, so 32 flows get roughly 2–3
+packets of window each. Fast retransmit needs **three duplicate ACKs**, which
+needs at least four packets in flight. With fewer, a single loss can't be
+detected quickly, so the sender sits out a whole retransmission timeout (200 ms
+minimum, five round trips here). Whoever times out falls behind, and fairness
+starts to slip. Robert Morris described this many-flows regime in "TCP Behavior
+with Many Flows" (1997), and it was fun to watch it show up in a sim without me
+building anything for it.
+
+Both tables come straight out of `npm run experiments`
+([`scripts/experiments.ts`](scripts/experiments.ts)). The sim is deterministic,
+so you'll get the same numbers.
+
 ## How it works
 
 <picture>
@@ -80,9 +107,10 @@ The full reasoning is in [DESIGN.md](DESIGN.md).
 npm install
 npm run dev     # play
 npm test        # 16 tests: unit tests + end-to-end behaviour (saturation, bufferbloat, fairness)
+npm run experiments   # regenerate the tables above
 ```
 
-## Honest limitations
+## Limitations
 
 - Whole-packet sequence numbers, no SACK, no delayed ACKs, and no window
   inflation during fast recovery. After a burst of losses, a sender goes quiet and
