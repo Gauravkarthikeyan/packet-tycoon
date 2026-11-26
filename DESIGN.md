@@ -13,16 +13,10 @@ networks have: bufferbloat, global synchronisation, unfair flows, timeouts.
 
 ## Topology
 
-```mermaid
-flowchart LR
-  S1[Sender 1<br/>Reno] --> R
-  S2[Sender 2<br/>CUBIC] --> R
-  S3[Sender 3<br/>...] --> R
-  R[(Router queue<br/>YOU)] -->|bottleneck link<br/>rate R, delay d| D[Receivers]
-  D -.->|ACKs, uncongested path| S1
-  D -.-> S2
-  D -.-> S3
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/topology-dark.svg">
+  <img alt="Senders feed one router queue, which drains over the bottleneck link to the receivers; ACKs return on an uncongested path." src="docs/topology-light.svg" width="880">
+</picture>
 
 - Access links from senders to the router are infinitely fast — the router is
   the only bottleneck, so everything interesting happens in one place: your queue.
