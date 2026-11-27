@@ -86,8 +86,8 @@ link stays at least 92 % busy.
 | one drop per RTT, oldest download packet | 34 ms | 0.0 % | 98.0 % | 54 |
 
 Doing nothing is the bufferbloat story from level 1, told from the victim's
-side. The call uses a tenth of the link and causes none of the queue, yet every
-one of its packets waits behind the downloads for almost 200 ms. Clipping the
+side. The call uses a tenth of the link and does nothing to grow the queue, yet
+its packets sit behind the downloads' and the slowest 5 % wait 197 ms or more. Clipping the
 queue fixes the delay but shoots the call: it loses 3 % of its packets, and
 unlike the downloads it has no way to recover them. Dropping only download
 packets saves the call, and pacing those drops (level 2's lesson) does it with
