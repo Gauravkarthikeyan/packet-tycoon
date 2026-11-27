@@ -60,4 +60,19 @@ describe("Network (end-to-end behaviour)", () => {
     expect(net.flowStats[0]!.drops).toBeGreaterThanOrEqual(1);
     expect(after).toBeGreaterThan(before);
   });
+
+  it("a video call suffers in a bloated queue it didn't fill", () => {
+    // 2 bulk Reno downloads + a 100 pkt/s video flow (flow 2).
+    const bloated = new Network({ ...base, queue: new DropTail(200), flows: 2, cbr: [100] });
+    const small = new Network({ ...base, queue: new DropTail(20), flows: 2, cbr: [100] });
+    bloated.run(20_000);
+    small.run(20_000);
+    expect(bloated.senders[2]!.algorithm).toBe("cbr");
+    expect(bloated.senders[2]!.stats.sent).toBe(2000);
+    // The video sends at a steady 10 % of the link, yet waits behind the downloads.
+    expect(bloated.flowDelayPercentile(2, 0.95)).toBeGreaterThan(100);
+    expect(small.flowDelayPercentile(2, 0.95)).toBeLessThanOrEqual(20);
+    // ...but a small drop-tail buffer drops its packets too.
+    expect(small.flowLoss(2)).toBeGreaterThan(bloated.flowLoss(2));
+  });
 });

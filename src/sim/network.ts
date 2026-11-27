@@ -1,6 +1,8 @@
+import { CbrSender } from "./cc/cbr";
 import { RenoSender } from "./cc/reno";
+import { Histogram } from "./histogram";
 import { Receiver } from "./receiver";
-import type { Ack, Packet, QueueDiscipline } from "./types";
+import type { Ack, Packet, QueueDiscipline, Sender } from "./types";
 
 export interface NetworkConfig {
   /** Bottleneck link rate in packets per second. */
@@ -10,7 +12,10 @@ export interface NetworkConfig {
   /** Delay of the (uncongested) ACK path back to the senders (ms). */
   ackDelay: number;
   queue: QueueDiscipline;
+  /** Number of NewReno flows. */
   flows: number;
+  /** Extra constant-bit-rate flows (pkt/s each), numbered after the Reno ones. */
+  cbr?: number[];
 }
 
 export interface FlowStats {
@@ -27,7 +32,7 @@ export interface FlowStats {
  */
 export class Network {
   now = 0;
-  readonly senders: RenoSender[];
+  readonly senders: Sender[];
   readonly receivers: Receiver[];
   readonly flowStats: FlowStats[];
   readonly queue: QueueDiscipline;
@@ -41,17 +46,21 @@ export class Network {
   /** Sum and count of queueing delays, for the average. */
   private delaySum = 0;
   private delayCount = 0;
-  /** delayHist[d] = how many packets waited exactly d ms (ticks are whole ms). */
-  private delayHist: number[] = [];
+  private delay = new Histogram();
+  private flowDelay: Histogram[];
   /** Packets the player removed by hand. */
   playerDrops = 0;
 
   constructor(readonly config: NetworkConfig) {
     this.queue = config.queue;
     this.txTime = 1000 / config.rate;
-    this.senders = Array.from({ length: config.flows }, (_, i) => new RenoSender(i));
-    this.receivers = Array.from({ length: config.flows }, (_, i) => new Receiver(i));
-    this.flowStats = Array.from({ length: config.flows }, () => ({ delivered: 0, drops: 0 }));
+    const reno = Array.from({ length: config.flows }, (_, i): Sender => new RenoSender(i));
+    const cbr = (config.cbr ?? []).map((rate, i): Sender => new CbrSender(config.flows + i, rate));
+    this.senders = [...reno, ...cbr];
+    const n = this.senders.length;
+    this.receivers = Array.from({ length: n }, (_, i) => new Receiver(i));
+    this.flowStats = Array.from({ length: n }, () => ({ delivered: 0, drops: 0 }));
+    this.flowDelay = Array.from({ length: n }, () => new Histogram());
   }
 
   /** Advance the simulation by `ticks` milliseconds. */
@@ -81,7 +90,8 @@ export class Network {
       const waited = now - (pkt.enqueuedAt ?? now);
       this.delaySum += waited;
       this.delayCount++;
-      this.delayHist[waited] = (this.delayHist[waited] ?? 0) + 1;
+      this.delay.add(waited);
+      this.flowDelay[pkt.flow]!.add(waited);
       this.linkFreeAt = Math.max(this.linkFreeAt, now - 1) + this.txTime;
       this.busyTime += this.txTime;
       this.onLink.push({ at: this.linkFreeAt + this.config.propDelay, pkt });
@@ -109,14 +119,18 @@ export class Network {
 
   /** The `p`-th percentile (0..1) of queueing delay so far, in ms. */
   delayPercentile(p: number): number {
-    if (this.delayCount === 0) return 0;
-    const rank = Math.ceil(p * this.delayCount);
-    let seen = 0;
-    for (let d = 0; d < this.delayHist.length; d++) {
-      seen += this.delayHist[d] ?? 0;
-      if (seen >= rank) return d;
-    }
-    return this.delayHist.length - 1;
+    return this.delay.percentile(p);
+  }
+
+  /** Same, for one flow's packets only. */
+  flowDelayPercentile(flow: number, p: number): number {
+    return this.flowDelay[flow]!.percentile(p);
+  }
+
+  /** Fraction of a flow's packets dropped at the router (by overflow or by you). */
+  flowLoss(flow: number): number {
+    const sent = this.senders[flow]!.stats.sent;
+    return sent === 0 ? 0 : this.flowStats[flow]!.drops / sent;
   }
 
   /** Fraction of time the bottleneck link was busy. */

@@ -12,14 +12,19 @@ export class CbrSender implements Sender {
   private nextSeq = 0;
   /** rate × latest RTT sample: the window this flow effectively has open. */
   private window = 0;
-  /** Fractional packets owed; carries over so any rate is hit exactly on average. */
+  /**
+   * Packets owed, in thousandths. Integer on purpose: adding 0.1 twenty
+   * thousand times in floating point comes out just under 2000.
+   */
   private credit = 0;
 
   constructor(
     readonly flow: number,
-    /** Packets per second. */
+    /** Packets per second (a whole number). */
     readonly rate: number,
-  ) {}
+  ) {
+    if (!Number.isInteger(rate) || rate < 0) throw new RangeError("rate must be a whole number >= 0");
+  }
 
   /**
    * No real window, so report rate × RTT: packets in flight at this rate. It
@@ -30,10 +35,10 @@ export class CbrSender implements Sender {
   }
 
   poll(now: number): Packet[] {
-    this.credit += this.rate / 1000;
+    this.credit += this.rate;
     const out: Packet[] = [];
-    while (this.credit >= 1) {
-      this.credit -= 1;
+    while (this.credit >= 1000) {
+      this.credit -= 1000;
       out.push({ flow: this.flow, seq: this.nextSeq++, sentAt: now, retransmit: false });
     }
     this.stats.sent += out.length;
