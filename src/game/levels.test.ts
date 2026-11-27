@@ -4,6 +4,7 @@ import { LEVELS, evaluate, startLevel, type Level } from "./levels";
 
 const level1 = LEVELS[0]!;
 const level2 = LEVELS[1]!;
+const level3 = LEVELS[2]!;
 
 function play(dropAbove: number | undefined) {
   const net = startLevel(level1);
@@ -78,6 +79,42 @@ describe("level 2: One at a time", () => {
         last = net.now;
       }
     });
+    expect(r.passed).toBe(true);
+  });
+});
+
+describe("level 3: Don't drop the call", () => {
+  const VIDEO = level3.goal.flow!;
+  const newestExcept = (net: Network, flow: number) => {
+    const pkts = net.queue.packets();
+    for (let i = pkts.length - 1; i >= 0; i--) if (pkts[i]!.flow !== flow) return i;
+    return -1;
+  };
+
+  it("fails if you just watch: the call waits behind the downloads", () => {
+    const r = playWith(level3, () => {});
+    expect(r.passed).toBe(false);
+    expect(r.p95Delay).toBeGreaterThan(level3.goal.maxP95Delay);
+  });
+
+  it("fails if you clip the queue blindly: you drop the call's packets too", () => {
+    const r = playWith(level3, (net) => {
+      while (net.queue.length > 35) net.dropAt(net.queue.length - 1);
+    });
+    expect(r.p95Delay).toBeLessThanOrEqual(level3.goal.maxP95Delay);
+    expect(r.loss!).toBeGreaterThan(level3.goal.maxLoss!);
+    expect(r.passed).toBe(false);
+  });
+
+  it("passes if you drop only the downloads' packets", () => {
+    const r = playWith(level3, (net) => {
+      while (net.queue.length > 35) {
+        const i = newestExcept(net, VIDEO);
+        if (i < 0) break;
+        net.dropAt(i);
+      }
+    });
+    expect(r.loss).toBe(0);
     expect(r.passed).toBe(true);
   });
 });

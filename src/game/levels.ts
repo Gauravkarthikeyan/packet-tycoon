@@ -6,7 +6,10 @@ export interface Level {
   title: string;
   /** One or two sentences shown before the level starts. */
   brief: string;
+  /** Bulk NewReno flows. */
   flows: number;
+  /** Constant-bit-rate flows (pkt/s each), numbered after the Reno flows. */
+  cbr?: number[];
   buffer: number;
   durationMs: number;
   /** Suggested game speed (simulated ms per frame); lower = more time to click. */
@@ -16,6 +19,10 @@ export interface Level {
     maxP95Delay: number;
     /** Link utilisation must reach at least this (0..1). */
     minUtilization: number;
+    /** If set, the delay and loss goals apply to this flow only. */
+    flow?: number;
+    /** If set, at most this fraction (0..1) of the goal flow's packets may be lost. */
+    maxLoss?: number;
   };
 }
 
@@ -45,10 +52,27 @@ export const LEVELS: readonly Level[] = [
     speed: 4,
     goal: { maxP95Delay: 30, minUtilization: 0.96 },
   },
+  {
+    id: 3,
+    title: "Don't drop the call",
+    brief:
+      "Two big downloads and a video call (green) share a 200-packet buffer. The call needs its packets within 40 ms and can't stand losing more than 1 % of them. The downloads don't care.",
+    flows: 2,
+    cbr: [100],
+    buffer: 200,
+    durationMs: 25_000,
+    speed: 4,
+    goal: { maxP95Delay: 40, minUtilization: 0.92, flow: 2, maxLoss: 0.01 },
+  },
 ];
 
 export function startLevel(level: Level): Network {
-  return new Network({ ...LINK, queue: new DropTail(level.buffer), flows: level.flows });
+  return new Network({
+    ...LINK,
+    queue: new DropTail(level.buffer),
+    flows: level.flows,
+    cbr: level.cbr,
+  });
 }
 
 export interface Result {
@@ -60,16 +84,22 @@ export interface Result {
    * hugging it closely rather than escaping it.
    */
   stars: 0 | 1 | 2 | 3;
+  /** p95 queueing delay of the goal flow (or all packets). */
   p95Delay: number;
+  /** Loss of the goal flow, when the level has a loss goal. */
+  loss?: number;
   utilization: number;
   playerDrops: number;
 }
 
 export function evaluate(net: Network, level: Level): Result {
-  const p95Delay = net.delayPercentile(0.95);
+  const { flow, maxLoss } = level.goal;
+  const p95Delay = flow === undefined ? net.delayPercentile(0.95) : net.flowDelayPercentile(flow, 0.95);
+  const loss = flow === undefined || maxLoss === undefined ? undefined : net.flowLoss(flow);
   const utilization = net.utilization;
   const { maxP95Delay, minUtilization } = level.goal;
-  const passed = p95Delay <= maxP95Delay && utilization >= minUtilization;
+  const passed =
+    p95Delay <= maxP95Delay && utilization >= minUtilization && (loss === undefined || loss <= maxLoss!);
   const stars = !passed
     ? 0
     : p95Delay <= 0.8 * maxP95Delay && utilization >= 0.97
@@ -77,5 +107,5 @@ export function evaluate(net: Network, level: Level): Result {
       : p95Delay <= 0.9 * maxP95Delay
         ? 2
         : 1;
-  return { passed, stars, p95Delay, utilization, playerDrops: net.playerDrops };
+  return { passed, stars, p95Delay, loss, utilization, playerDrops: net.playerDrops };
 }
