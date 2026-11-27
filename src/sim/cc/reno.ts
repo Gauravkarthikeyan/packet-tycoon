@@ -1,4 +1,4 @@
-import type { Ack, Packet } from "../types";
+import type { Ack, Packet, Sender } from "../types";
 
 const MIN_RTO = 200;
 const MAX_RTO = 60_000;
@@ -17,7 +17,7 @@ const DUP_ACK_THRESHOLD = 3;
  * Simplification: no window inflation during recovery, so the sender goes
  * quiet for about an RTT after a loss instead of trickling new data.
  */
-export class RenoSender {
+export class RenoSender implements Sender {
   readonly algorithm = "reno";
 
   cwnd = 1;

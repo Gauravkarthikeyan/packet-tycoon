@@ -30,3 +30,15 @@ export interface QueueDiscipline {
   /** Snapshot for rendering, front of the queue first. */
   packets(): readonly Packet[];
 }
+
+/** Anything that sends packets into the network and listens to ACKs. */
+export interface Sender {
+  readonly flow: number;
+  /** Short name for the UI: "reno", "cbr", ... */
+  readonly algorithm: string;
+  /** Congestion window, or for senders without one, packets currently in flight. */
+  readonly cwnd: number;
+  readonly stats: { sent: number; retransmitted: number; fastRetransmits: number; timeouts: number };
+  poll(now: number): Packet[];
+  onAck(ack: Ack, now: number): void;
+}
