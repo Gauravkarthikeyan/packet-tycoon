@@ -81,3 +81,58 @@ for (const [name, player] of players) {
   const timeouts = net.senders.reduce((a, s) => a + s.stats.timeouts, 0);
   console.log(`| ${name} | ${net.delayPercentile(0.95)} ms | ${pct(net.utilization)} | ${drops} | ${timeouts} |`);
 }
+
+// A video call (100 pkt/s, flow 2) sharing a 200-packet buffer with two bulk
+// downloads. What happens to the call under each strategy, 25 s.
+const CALL = 2;
+const oldestExcept = (net: Network, flow: number): number =>
+  net.queue.packets().findIndex((p) => p.flow !== flow);
+const newestExcept = (net: Network, flow: number): number => {
+  const pkts = net.queue.packets();
+  for (let i = pkts.length - 1; i >= 0; i--) if (pkts[i]!.flow !== flow) return i;
+  return -1;
+};
+const callPlayers: [string, Player][] = [
+  ["do nothing", () => {}],
+  [
+    "drop everything above 35",
+    (net) => {
+      while (net.queue.length > 35) net.dropAt(net.queue.length - 1);
+    },
+  ],
+  [
+    "drop downloads above 35",
+    (net) => {
+      while (net.queue.length > 35) {
+        const i = newestExcept(net, CALL);
+        if (i < 0) break;
+        net.dropAt(i);
+      }
+    },
+  ],
+  [
+    "one drop per RTT, oldest download packet",
+    (net, last) => {
+      if (net.queue.length > 35 && net.now - last.at >= 40) {
+        const i = oldestExcept(net, CALL);
+        if (i >= 0) net.dropAt(i);
+        last.at = net.now;
+      }
+    },
+  ],
+];
+
+console.log("\n## Video call + two downloads, 200-packet buffer, 25 s\n");
+console.log("| Strategy | Call p95 delay | Call packets lost | Link utilisation | Your drops |");
+console.log("|---|---:|---:|---:|---:|");
+for (const [name, player] of callPlayers) {
+  const net = new Network({ ...base, queue: new DropTail(200), flows: 2, cbr: [100] });
+  const last = { at: -Infinity };
+  for (let t = 0; t < 25_000; t++) {
+    net.tick();
+    player(net, last);
+  }
+  console.log(
+    `| ${name} | ${net.flowDelayPercentile(CALL, 0.95)} ms | ${pct(net.flowLoss(CALL))} | ${pct(net.utilization)} | ${net.playerDrops} |`,
+  );
+}

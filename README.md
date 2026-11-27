@@ -13,7 +13,7 @@ times and never really *felt* why it happens. Now I can cause it on purpose.
 
 ![packet-tycoon sandbox: router queue on the left, cwnd sawtooth per flow and queue length on the right](docs/screenshot.png)
 
-> **Status:** the sandbox and two levels are playable: click packets in the queue
+> **Status:** the sandbox and three levels are playable: click packets in the queue
 > to drop them. More levels and unlockable queue algorithms (RED, CoDel, fair
 > queueing) are next.
 
@@ -68,6 +68,34 @@ is what matters. Dropping the **oldest** packet is best: same throughput with
 37 fewer drops and no timeouts, because the sender learns about the loss a
 whole queue's worth of waiting earlier. It's also one of the reasons CoDel drops
 from the head of the queue.
+
+## Level 3: Don't drop the call
+
+Two bulk downloads and a video call share a 200-packet buffer. The call is a
+new kind of sender: it sends a steady 100 packets per second and never slows
+down, because a video call can't wait. It never retransmits either: a frame
+that arrives late is as useless as one that never arrives. The goal is about the call
+alone: 95 % of its packets within 40 ms, at most 1 % of them lost, while the
+link stays at least 92 % busy.
+
+| Strategy | Call p95 delay | Call packets lost | Link utilisation | Your drops |
+|---|---:|---:|---:|---:|
+| do nothing | 197 ms | 0.0 % | 99.5 % | 0 |
+| drop everything above 35 | 35 ms | 3.1 % | 95.2 % | 169 |
+| drop downloads above 35 | 35 ms | 0.0 % | 94.5 % | 113 |
+| one drop per RTT, oldest download packet | 34 ms | 0.0 % | 98.0 % | 54 |
+
+Doing nothing is the bufferbloat story from level 1, told from the victim's
+side. The call uses a tenth of the link and causes none of the queue, yet every
+one of its packets waits behind the downloads for almost 200 ms. Clipping the
+queue fixes the delay but shoots the call: it loses 3 % of its packets, and
+unlike the downloads it has no way to recover them. Dropping only download
+packets saves the call, and pacing those drops (level 2's lesson) does it with
+less than half the clicks.
+
+On the cwnd chart the call doesn't have a window, so it's drawn as rate × RTT:
+the packets it has in flight. That green line climbing while the queue fills is
+what lag looks like.
 
 ## Things I found playing with it
 
@@ -148,7 +176,7 @@ The full reasoning is in [DESIGN.md](DESIGN.md).
 ```sh
 npm install
 npm run dev     # play
-npm test        # 31 tests: unit, end-to-end behaviour, and that the levels are winnable
+npm test        # 40 tests: unit, end-to-end behaviour, and that the levels are winnable
 npm run experiments   # regenerate every table in this README
 ```
 
@@ -168,7 +196,8 @@ npm run experiments   # regenerate every table in this README
 - [x] Sandbox with live charts
 - [x] Click packets to drop them; level system with goals, stars and a score screen
 - [x] Level 2: four flows, pace your drops
-- [ ] More levels (a latency-sensitive video call, a bursty download)
+- [x] Level 3: a video call (constant-bit-rate sender) that needs low delay and no loss
+- [ ] More levels (a bursty download, mixed RTTs)
 - [ ] Power-ups: RED, CoDel, fair queueing
 - [ ] More senders: CUBIC, BBR-lite (good luck taming that one)
 - [ ] Mixed RTTs, bursty "Windows Update" traffic, a latency-sensitive video-call flow
