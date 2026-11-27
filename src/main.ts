@@ -89,7 +89,10 @@ function showOverlay(title: string, body: string | Node, actions: [string, () =>
 }
 
 function showBrief(l: Level): void {
-  const goal = `Goal: 95 % of packets wait ≤ ${l.goal.maxP95Delay} ms, and the link stays ≥ ${l.goal.minUtilization * 100} % busy, for ${l.durationMs / 1000} simulated seconds.`;
+  const g = l.goal;
+  const who = g.flow === undefined ? "packets" : "the call's packets";
+  const loss = g.maxLoss === undefined ? "" : `, at most ${g.maxLoss * 100} % of them lost,`;
+  const goal = `Goal: 95 % of ${who} wait ≤ ${g.maxP95Delay} ms${loss} and the link stays ≥ ${g.minUtilization * 100} % busy, for ${l.durationMs / 1000} simulated seconds.`;
   showOverlay(`Level ${l.id}: ${l.title}`, `${l.brief} ${goal}`, [
     [
       "Start",
@@ -110,15 +113,26 @@ function showResult(l: Level, r: Result): void {
   const verdict = document.createElement("p");
   verdict.textContent = r.passed
     ? "The queue stayed short and the link stayed busy."
-    : r.p95Delay > l.goal.maxP95Delay
+    : r.loss !== undefined && r.loss > l.goal.maxLoss!
+      ? "You dropped the call's packets. A video call can't resend them, so drop the downloads' packets instead."
+      : r.p95Delay > l.goal.maxP95Delay
       ? "Too much waiting. The queue grew past the line; drop a packet before it gets there."
       : "The link sat idle. Every drop halves a sender's window, so drop less often.";
   const table = document.createElement("table");
-  for (const [k, v] of [
-    ["p95 queueing delay", `${r.p95Delay} ms (goal ≤ ${l.goal.maxP95Delay})`],
+  const rows: [string, string][] = [
+    [
+      l.goal.flow === undefined ? "p95 queueing delay" : "call's p95 delay",
+      `${r.p95Delay} ms (goal ≤ ${l.goal.maxP95Delay})`,
+    ],
+  ];
+  if (r.loss !== undefined) {
+    rows.push(["call's packets lost", `${(r.loss * 100).toFixed(1)} % (goal ≤ ${l.goal.maxLoss! * 100})`]);
+  }
+  rows.push(
     ["link utilisation", `${(r.utilization * 100).toFixed(1)} % (goal ≥ ${l.goal.minUtilization * 100})`],
     ["packets you dropped", String(r.playerDrops)],
-  ]) {
+  );
+  for (const [k, v] of rows) {
     table.insertRow().append(...[k, v].map((t) => Object.assign(document.createElement("td"), { textContent: t })));
   }
   card.append(stars, verdict, table);
@@ -151,14 +165,16 @@ function showResult(l: Level, r: Result): void {
 }
 
 function updateHud(l: Level): void {
-  const p95 = net.delayPercentile(0.95);
-  const util = net.utilization;
+  // Same numbers the score screen will use, so the HUD never disagrees with it.
+  const r = evaluate(net, l);
+  const g = l.goal;
   const left = Math.max(0, (l.durationMs - net.now) / 1000);
   const item = (text: string, ok: boolean) => `<span class="${ok ? "ok" : "bad"}">${text}</span>`;
   hud.innerHTML =
     `<span>${left.toFixed(1)} s left</span>` +
-    item(`p95 ${p95} ms`, p95 <= l.goal.maxP95Delay) +
-    item(`util ${(util * 100).toFixed(0)} %`, util >= l.goal.minUtilization);
+    item(`${g.flow === undefined ? "" : "call "}p95 ${r.p95Delay} ms`, r.p95Delay <= g.maxP95Delay) +
+    (r.loss === undefined ? "" : item(`loss ${(r.loss * 100).toFixed(1)} %`, r.loss <= g.maxLoss!)) +
+    item(`util ${(r.utilization * 100).toFixed(0)} %`, r.utilization >= g.minUtilization);
 }
 
 function resize(): void {
